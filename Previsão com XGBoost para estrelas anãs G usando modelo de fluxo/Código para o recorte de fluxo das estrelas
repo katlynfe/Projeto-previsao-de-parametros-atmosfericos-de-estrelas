@@ -1,0 +1,133 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
+import random
+import glob
+import pandas as pd
+import os
+
+
+# Definir o caminho para a pasta com os arquivos txt
+caminho_pasta = '/home/katlyn/Downloads/Pesquisa/Baixar espectros da fonte - APOGEE/output2'
+
+# Usar glob para encontrar todos os arquivos txt na pasta
+arquivos_txt = glob.glob(caminho_pasta + '/*.txt')
+
+vetor_todos_comprimentos = []
+fluxos_recorte_todos = []
+
+# Crie uma pasta para armazenar as figuras, caso ainda não exista
+pasta_figuras = '/home/katlyn/Downloads/Pesquisa/Baixar espectros da fonte - APOGEE/Figuras do recorte de fluxo'
+os.makedirs(pasta_figuras, exist_ok=True)
+
+
+# Dentro do loop, adicione um contador para nomear as figuras
+contador = 1
+
+# Ler o fluxo de cada arquivo de espectro
+for arquivo in arquivos_txt:
+    # Extrair o nome da estrela a partir do nome do arquivo
+    nome_estrela = os.path.basename(arquivo).split('.')[0]
+    data = np.loadtxt(arquivo)
+    intensidades = data[:, 1]
+    comprimento_onda = data[:, 0]
+    
+
+    linhas = {
+        'Linhas Fe I Red G': [15194.492, 15207.528, 15395.718, 15490.339, 15648.515, 15964.867, 16040.657, 16153.247, 16165.032],
+        'Linhas Co': [15570, 15970, 16184, 16600],
+        'Linhas CI': [15784.7, 16005.0, 16021.7],
+        'Linhas CN': [15260, 15322, 15397, 15332, 15410, 15447, 15466, 15472, 15482, 15580.88],
+        'Linhas OH': [15278.334, 15568.780, 16190.263, 16192.208],
+        'Linhas Na I': [16373.853, 16388.858],
+        'Linhas Mg I': [15740.716, 15748.988, 15765.842, 15879.5, 15886.2, 15954.477],
+        'Linhas Al I': [16718.957, 16750.564, 16763.360],
+        'Linhas Si I': [15361.161, 15376.831, 15888.410, 15960.063, 16060.009, 16094.787, 16215.67, 16680.770, 16828.159],
+        'Linhas K I': [15163.067, 15168.376],
+        'Linhas Ca I': [16136.823, 16150.763, 16155.236, 16157.364],
+        'Linhas Ti I': [15334.847, 15543.756, 15602.842, 15698.979, 15715.573, 16635.161],
+        'Linhas V I': [15924.0],
+        'Linhas Cr I': [15680.063],
+        'Linhas Mn I': [15159.0, 15217.0, 15262.0]
+    }
+
+    intervalo_inicial = 15100
+    intervalo_final = 17000
+    tamanho_intervalo = 50
+
+    # Dividir os dados em intervalos
+    intervalos = np.arange(intervalo_inicial, intervalo_final + tamanho_intervalo, tamanho_intervalo)
+
+    # Gerar uma lista de cores aleatórias para as linhas atômicas
+    cores = [random.choice(['blue', 'green', 'red', 'cyan', 'magenta', 'yellow', 'black']) for _ in range(len(linhas))]
+    
+    # Criar uma nova figura e eixos para a estrela atual
+    fig, ax = plt.subplots()
+
+    
+    # Percorrer os intervalos
+    for intervalo in intervalos:
+        # Filtrar os dados dentro do intervalo atual
+        intervalo_comprimento_onda = comprimento_onda[(comprimento_onda >= intervalo) & (comprimento_onda < intervalo + tamanho_intervalo)]
+        intervalo_intensidades = intensidades[(comprimento_onda >= intervalo) & (comprimento_onda < intervalo + tamanho_intervalo)]
+
+        # Verificar se há linhas atômicas dentro do intervalo atual
+        linhas_intervalo = {}
+        for label, linhas_atomicas in linhas.items():
+            linhas_intervalo[label] = [linha for linha in linhas_atomicas if intervalo <= linha < intervalo + tamanho_intervalo]
+
+        if any(linhas_intervalo.values()):
+        
+
+            # Percorrer as linhas atômicas
+            for label, linhas_atomicas in linhas_intervalo.items():
+                for linha in linhas_atomicas:
+                    cor = cores[list(linhas.keys()).index(label)]
+                   
+                    window_width = 3
+                    window_height = np.max(intervalo_intensidades) - np.min(intervalo_intensidades)
+                    rect = Rectangle((linha - window_width / 2, np.min(intervalo_intensidades)), window_width, window_height, fill=False, edgecolor='black')
+
+                    # Filtrar os dados dentro do retângulo
+                    recorte_comprimento_onda = intervalo_comprimento_onda[(intervalo_comprimento_onda >= linha - window_width / 2) & (intervalo_comprimento_onda <= linha + window_width / 2)]
+                    recorte_intensidades = intervalo_intensidades[(intervalo_comprimento_onda >= linha - window_width / 2) & (intervalo_comprimento_onda <= linha + window_width / 2)]
+                    
+                    for a in recorte_comprimento_onda:
+                        vetor_todos_comprimentos.append(a)
+                        
+                    
+    mask = np.in1d(comprimento_onda, np.unique(vetor_todos_comprimentos)) 
+    np.savetxt("mask_comp_todos.txt", np.array(mask))
+    flux_mask = intensidades[mask]
+    fluxos_recorte_todos.append(flux_mask)
+    #break
+
+    # Fazendo a figura do fluxo
+    #print(flux_mask)
+    ax.plot(flux_mask)
+    ax.set_xlabel('Pixel')
+    ax.set_xlabel('Fluxo')
+    # Obter o nome da estrela a partir do nome do arquivo
+    nome_estrela = os.path.basename(arquivo).split('.')[0]
+    ax.set_title(nome_estrela)
+
+    # Salvar a figura em um arquivo
+    nome_figura = f'{pasta_figuras}/{nome_estrela}.png'
+    #plt.savefig(nome_figura)
+
+
+    # Incrementar o contador para o próximo arquivo
+    contador += 1
+
+    # Fechar a figura para liberar memória antes de criar a próxima figura
+    plt.close()
+    #break                   
+
+    # Salva os comprimentos de onda em um array
+    np.savetxt("vetor__todos_comprimentos.txt", np.array(vetor_todos_comprimentos))
+
+    #print(flux_mask)
+
+    #Salva o vetor em um arquivo de texto
+    np.savetxt("fluxo_intervalo_estrelas_exo.txt", np.array(fluxos_recorte_todos))
+    # gerou 904 comprimentos de onda
